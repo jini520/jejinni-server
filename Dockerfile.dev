@@ -1,0 +1,14 @@
+# 개발 환경용 Dockerfile (핫 리로드 지원)
+FROM gradle:8-jdk17-alpine
+
+WORKDIR /app
+
+# Gradle 래퍼 권한 설정
+RUN chmod +x gradlew || true
+
+# 포트 노출
+EXPOSE 8080
+
+# 개발 모드로 실행 (핫 리로드)
+CMD ["gradle", "bootRun", "--no-daemon"]
+
