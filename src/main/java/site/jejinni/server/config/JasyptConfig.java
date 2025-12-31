@@ -7,9 +7,11 @@ import org.jasypt.encryption.pbe.config.SimpleStringPBEConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @EnableEncryptableProperties
+@Profile({"prod"})
 public class JasyptConfig {
 
   @Value("${jasypt.encryptor.password}")

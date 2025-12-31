@@ -13,4 +13,3 @@ public class ApiResponse<T> {
 	@JsonProperty("data")
 	private T data;
 }
-
