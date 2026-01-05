@@ -100,5 +100,5 @@ Thumbs.db
 
 # Environment variables
 .env
-src/main/resources/application-dev.properties
-src/main/resources/application-test.properties
+application-dev.properties
+application-test.properties
