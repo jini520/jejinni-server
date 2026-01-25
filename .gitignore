@@ -102,3 +102,6 @@ Thumbs.db
 .env
 application-dev.properties
 application-test.properties
+
+# Uploaded files
+uploads/
