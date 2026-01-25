@@ -29,7 +29,7 @@ public class FileController {
    * 파일 리스트 조회 (Read)
    * GET /api/files?type=IMAGE&page=0&size=10 또는 ?type=DOCUMENT&page=0&size=10
    */
-  @GetMapping
+  @GetMapping(produces = "application/json")
   public ResponseEntity<ApiResponse<FileListDto>> getFileList(
       @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type,
       @RequestParam(value = "page", defaultValue = "0") int page,
