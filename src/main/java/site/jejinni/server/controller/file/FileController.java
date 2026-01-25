@@ -9,11 +9,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import site.jejinni.server.dto.common.ApiResponse;
 import site.jejinni.server.dto.file.FileDto;
+import site.jejinni.server.dto.file.FileListDto;
 import site.jejinni.server.service.file.FileStorageService;
 import site.jejinni.server.service.file.FileType;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/files")
@@ -21,6 +24,63 @@ import java.util.UUID;
 public class FileController {
 
   private final FileStorageService fileStorageService;
+
+  /**
+   * 파일 리스트 조회 (Read)
+   * GET /api/files?type=IMAGE&page=0&size=10 또는 ?type=DOCUMENT&page=0&size=10
+   */
+  @GetMapping
+  public ResponseEntity<ApiResponse<FileListDto>> getFileList(
+      @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type,
+      @RequestParam(value = "page", defaultValue = "0") int page,
+      @RequestParam(value = "size", defaultValue = "10") int size) {
+
+    List<FileStorageService.FileInfo> fileInfoList = fileStorageService.getFileList(type, page, size);
+    long totalElements = fileStorageService.getFileCount(type);
+    int totalPages = (int) Math.ceil((double) totalElements / size);
+
+    List<FileDto> fileDtoList = fileInfoList.stream().map(fileInfo -> {
+      try {
+        long fileSize = fileStorageService.getFileSize(fileInfo.getId(), fileInfo.getExtension(), type);
+        LocalDateTime createdAt = fileStorageService.getFileCreatedAt(fileInfo.getId(), fileInfo.getExtension(), type);
+        LocalDateTime updatedAt = fileStorageService.getFileUpdatedAt(fileInfo.getId(), fileInfo.getExtension(), type);
+
+        return FileDto.builder()
+            .id(fileInfo.getId())
+            .extension(fileInfo.getExtension())
+            .fileType(type)
+            .fileSize(fileSize)
+            .downloadUrl(
+                "/api/files/download/" + fileInfo.getId() + "?extension=" + fileInfo.getExtension() + "&type=" + type)
+            .exists(true)
+            .createdAt(createdAt)
+            .updatedAt(updatedAt)
+            .build();
+      } catch (Exception ex) {
+        // 파일 정보 조회 실패 시 기본 정보만 반환
+        return FileDto.builder()
+            .id(fileInfo.getId())
+            .extension(fileInfo.getExtension())
+            .fileType(type)
+            .downloadUrl(
+                "/api/files/download/" + fileInfo.getId() + "?extension=" + fileInfo.getExtension() + "&type=" + type)
+            .exists(true)
+            .build();
+      }
+    }).collect(Collectors.toList());
+
+    FileListDto fileListDto = FileListDto.builder()
+        .items(fileDtoList)
+        .totalPages(totalPages)
+        .totalElements(totalElements)
+        .size(size)
+        .number(page)
+        .first(page == 0)
+        .last(page >= totalPages - 1)
+        .build();
+
+    return ResponseEntity.ok(new ApiResponse<>(fileListDto));
+  }
 
   /**
    * 파일 업로드 (Create)

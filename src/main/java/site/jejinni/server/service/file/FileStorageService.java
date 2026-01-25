@@ -14,9 +14,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 public class FileStorageService {
@@ -306,6 +309,76 @@ public class FileStorageService {
       return LocalDateTime.ofInstant(lastModifiedTime.toInstant(), ZoneId.systemDefault());
     } catch (IOException ex) {
       throw new RuntimeException("파일 수정일을 조회할 수 없습니다: " + id, ex);
+    }
+  }
+
+  /**
+   * 파일 리스트 조회
+   * 
+   * @param fileType 파일 타입 (IMAGE 또는 DOCUMENT)
+   * @param page     페이지 번호 (0부터 시작)
+   * @param size     페이지 크기
+   * @return 파일 정보 리스트
+   */
+  public List<FileInfo> getFileList(FileType fileType, int page, int size) {
+    try {
+      Path storageLocation = getStorageLocation(fileType);
+      List<FileInfo> fileList = new ArrayList<>();
+
+      try (Stream<Path> paths = Files.list(storageLocation)) {
+        List<Path> sortedPaths = paths
+            .filter(Files::isRegularFile)
+            .sorted((p1, p2) -> {
+              try {
+                return Files.getLastModifiedTime(p2).compareTo(Files.getLastModifiedTime(p1));
+              } catch (IOException e) {
+                return 0;
+              }
+            })
+            .toList();
+
+        int start = page * size;
+        int end = Math.min(start + size, sortedPaths.size());
+
+        for (int i = start; i < end; i++) {
+          Path filePath = sortedPaths.get(i);
+          String fileName = filePath.getFileName().toString();
+
+          // UUID와 extension 분리
+          int lastDotIndex = fileName.lastIndexOf(".");
+          if (lastDotIndex == -1) {
+            // 확장자가 없는 경우
+            UUID fileId = UUID.fromString(fileName);
+            fileList.add(new FileInfo(fileId, ""));
+          } else {
+            String idString = fileName.substring(0, lastDotIndex);
+            String extension = fileName.substring(lastDotIndex);
+            UUID fileId = UUID.fromString(idString);
+            fileList.add(new FileInfo(fileId, extension));
+          }
+        }
+      }
+
+      return fileList;
+    } catch (IOException ex) {
+      throw new RuntimeException("파일 리스트를 조회할 수 없습니다: " + fileType, ex);
+    }
+  }
+
+  /**
+   * 파일 총 개수 조회
+   * 
+   * @param fileType 파일 타입 (IMAGE 또는 DOCUMENT)
+   * @return 파일 총 개수
+   */
+  public long getFileCount(FileType fileType) {
+    try {
+      Path storageLocation = getStorageLocation(fileType);
+      try (Stream<Path> paths = Files.list(storageLocation)) {
+        return paths.filter(Files::isRegularFile).count();
+      }
+    } catch (IOException ex) {
+      throw new RuntimeException("파일 개수를 조회할 수 없습니다: " + fileType, ex);
     }
   }
 }
