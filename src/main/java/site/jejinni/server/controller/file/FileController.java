@@ -47,11 +47,11 @@ public class FileController {
 
         return FileDto.builder()
             .id(fileInfo.getId())
-            .extension(fileInfo.getExtension())
+            .originalFileName(fileInfo.getOriginalFileName())
             .fileType(type)
             .fileSize(fileSize)
             .downloadUrl(
-                "/api/files/download/" + fileInfo.getId() + "?extension=" + fileInfo.getExtension() + "&type=" + type)
+                "/api/files/download/" + fileInfo.getId() + "?type=" + type)
             .exists(true)
             .createdAt(createdAt)
             .updatedAt(updatedAt)
@@ -60,10 +60,10 @@ public class FileController {
         // 파일 정보 조회 실패 시 기본 정보만 반환
         return FileDto.builder()
             .id(fileInfo.getId())
-            .extension(fileInfo.getExtension())
+            .originalFileName(fileInfo.getOriginalFileName())
             .fileType(type)
             .downloadUrl(
-                "/api/files/download/" + fileInfo.getId() + "?extension=" + fileInfo.getExtension() + "&type=" + type)
+                "/api/files/download/" + fileInfo.getId() + "?type=" + type)
             .exists(true)
             .build();
       }
@@ -93,15 +93,9 @@ public class FileController {
 
     FileStorageService.FileInfo fileInfo = fileStorageService.storeFile(file, type);
 
-    String originalFilename = file.getOriginalFilename();
-    String originalName = originalFilename;
+    // originalFileName: 전체 파일명 저장 (확장자 포함)
+    String originalName = fileInfo.getOriginalFileName() != null ? fileInfo.getOriginalFileName() : "";
     String extension = fileInfo.getExtension();
-
-    // originalFileName에서 extension 제거
-    if (originalFilename != null && originalFilename.contains(".")) {
-      int lastDotIndex = originalFilename.lastIndexOf(".");
-      originalName = originalFilename.substring(0, lastDotIndex);
-    }
 
     // 파일 생성일과 수정일 조회
     LocalDateTime createdAt = fileStorageService.getFileCreatedAt(fileInfo.getId(), extension, type);
@@ -110,11 +104,10 @@ public class FileController {
     FileDto fileDto = FileDto.builder()
         .id(fileInfo.getId())
         .originalFileName(originalName)
-        .extension(extension)
         .fileSize(file.getSize())
         .contentType(file.getContentType())
         .fileType(type)
-        .downloadUrl("/api/files/download/" + fileInfo.getId() + "?extension=" + extension + "&type=" + type)
+        .downloadUrl("/api/files/download/" + fileInfo.getId() + "?type=" + type)
         .exists(true)
         .createdAt(createdAt)
         .updatedAt(updatedAt)
@@ -125,15 +118,14 @@ public class FileController {
 
   /**
    * 파일 다운로드 (Read)
-   * GET /api/files/download/{id}?extension=.jpg&type=IMAGE 또는
-   * ?extension=.pdf&type=DOCUMENT
+   * GET /api/files/download/{id}?type=IMAGE 또는 ?type=DOCUMENT
    */
   @GetMapping("/download/{id}")
   @SuppressWarnings("null")
   public ResponseEntity<Resource> downloadFile(
       @PathVariable UUID id,
-      @RequestParam(value = "extension", defaultValue = "") String extension,
       @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type) {
+    String extension = fileStorageService.getFileExtension(id, type);
     Resource resource = fileStorageService.loadFileAsResource(id, extension, type);
 
     return ResponseEntity.ok()
@@ -145,19 +137,19 @@ public class FileController {
 
   /**
    * 파일 정보 조회 (Read)
-   * GET /api/files/{id}?extension=.jpg&type=IMAGE 또는
-   * ?extension=.pdf&type=DOCUMENT
+   * GET /api/files/{id}?type=IMAGE 또는 ?type=DOCUMENT
    */
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<FileDto>> getFileInfo(
       @PathVariable UUID id,
-      @RequestParam(value = "extension", defaultValue = "") String extension,
       @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type) {
+    String extension = fileStorageService.getFileExtension(id, type);
     boolean exists = fileStorageService.fileExists(id, extension, type);
 
+    String originalFileName = fileStorageService.getOriginalFileName(id, type);
     FileDto fileDto = FileDto.builder()
         .id(id)
-        .extension(extension)
+        .originalFileName(originalFileName)
         .fileType(type)
         .exists(exists)
         .build();
@@ -169,10 +161,10 @@ public class FileController {
         LocalDateTime updatedAt = fileStorageService.getFileUpdatedAt(id, extension, type);
         fileDto = FileDto.builder()
             .id(id)
-            .extension(extension)
+            .originalFileName(originalFileName)
             .fileType(type)
             .fileSize(fileSize)
-            .downloadUrl("/api/files/download/" + id + "?extension=" + extension + "&type=" + type)
+            .downloadUrl("/api/files/download/" + id + "?type=" + type)
             .exists(true)
             .createdAt(createdAt)
             .updatedAt(updatedAt)
@@ -183,20 +175,20 @@ public class FileController {
           LocalDateTime updatedAt = fileStorageService.getFileUpdatedAt(id, extension, type);
           fileDto = FileDto.builder()
               .id(id)
-              .extension(extension)
+              .originalFileName(originalFileName)
               .fileType(type)
               .exists(true)
-              .downloadUrl("/api/files/download/" + id + "?extension=" + extension + "&type=" + type)
+              .downloadUrl("/api/files/download/" + id + "?type=" + type)
               .createdAt(createdAt)
               .updatedAt(updatedAt)
               .build();
         } catch (Exception dateEx) {
           fileDto = FileDto.builder()
               .id(id)
-              .extension(extension)
+              .originalFileName(originalFileName)
               .fileType(type)
               .exists(true)
-              .downloadUrl("/api/files/download/" + id + "?extension=" + extension + "&type=" + type)
+              .downloadUrl("/api/files/download/" + id + "?type=" + type)
               .build();
         }
       }
@@ -207,27 +199,20 @@ public class FileController {
 
   /**
    * 파일 업데이트 (Update)
-   * PUT /api/files/{id}?extension=.jpg&type=IMAGE 또는
-   * ?extension=.pdf&type=DOCUMENT
+   * PUT /api/files/{id}?type=IMAGE 또는 ?type=DOCUMENT
    */
   @PutMapping("/{id}")
   public ResponseEntity<ApiResponse<FileDto>> updateFile(
       @PathVariable UUID id,
-      @RequestParam(value = "extension", defaultValue = "") String extension,
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type) {
 
-    FileStorageService.FileInfo newFileInfo = fileStorageService.updateFile(id, extension, file, type);
+    String oldExtension = fileStorageService.getFileExtension(id, type);
+    FileStorageService.FileInfo newFileInfo = fileStorageService.updateFile(id, oldExtension, file, type);
 
-    String originalFilename = file.getOriginalFilename();
-    String originalName = originalFilename;
+    // originalFileName: 전체 파일명 저장 (확장자 포함)
+    String originalName = newFileInfo.getOriginalFileName() != null ? newFileInfo.getOriginalFileName() : "";
     String newExtension = newFileInfo.getExtension();
-
-    // originalFileName에서 extension 제거
-    if (originalFilename != null && originalFilename.contains(".")) {
-      int lastDotIndex = originalFilename.lastIndexOf(".");
-      originalName = originalFilename.substring(0, lastDotIndex);
-    }
 
     // 파일 생성일과 수정일 조회
     LocalDateTime createdAt = fileStorageService.getFileCreatedAt(newFileInfo.getId(), newExtension, type);
@@ -236,11 +221,10 @@ public class FileController {
     FileDto fileDto = FileDto.builder()
         .id(newFileInfo.getId())
         .originalFileName(originalName)
-        .extension(newExtension)
         .fileSize(file.getSize())
         .contentType(file.getContentType())
         .fileType(type)
-        .downloadUrl("/api/files/download/" + newFileInfo.getId() + "?extension=" + newExtension + "&type=" + type)
+        .downloadUrl("/api/files/download/" + newFileInfo.getId() + "?type=" + type)
         .exists(true)
         .createdAt(createdAt)
         .updatedAt(updatedAt)
@@ -251,14 +235,13 @@ public class FileController {
 
   /**
    * 파일 삭제 (Delete)
-   * DELETE /api/files/{id}?extension=.jpg&type=IMAGE 또는
-   * ?extension=.pdf&type=DOCUMENT
+   * DELETE /api/files/{id}?type=IMAGE 또는 ?type=DOCUMENT
    */
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<String>> deleteFile(
       @PathVariable UUID id,
-      @RequestParam(value = "extension", defaultValue = "") String extension,
       @RequestParam(value = "type", defaultValue = "DOCUMENT") FileType type) {
+    String extension = fileStorageService.getFileExtension(id, type);
     fileStorageService.deleteFile(id, extension, type);
     return ResponseEntity.ok(new ApiResponse<>("파일이 삭제되었습니다: " + id));
   }

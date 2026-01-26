@@ -13,7 +13,6 @@ public class FileDto {
 
   private UUID id;
   private String originalFileName;
-  private String extension;
   private Long fileSize;
   private String contentType;
   private FileType fileType;

@@ -29,10 +29,18 @@ public class FileStorageService {
   public static class FileInfo {
     private final UUID id;
     private final String extension;
+    private final String originalFileName;
 
     public FileInfo(UUID id, String extension) {
       this.id = id;
       this.extension = extension != null ? extension : "";
+      this.originalFileName = null;
+    }
+
+    public FileInfo(UUID id, String extension, String originalFileName) {
+      this.id = id;
+      this.extension = extension != null ? extension : "";
+      this.originalFileName = originalFileName;
     }
 
     public UUID getId() {
@@ -41,6 +49,10 @@ public class FileStorageService {
 
     public String getExtension() {
       return extension;
+    }
+
+    public String getOriginalFileName() {
+      return originalFileName;
     }
   }
 
@@ -87,14 +99,21 @@ public class FileStorageService {
     }
 
     UUID fileId = UUID.randomUUID();
-    FileInfo fileInfo = new FileInfo(fileId, fileExtension);
     String fileName = fileId.toString() + fileExtension;
+    String originalName = originalFilename != null ? originalFilename : "";
 
     try {
       Path storageLocation = getStorageLocation(fileType);
       Path targetLocation = storageLocation.resolve(fileName);
       Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-      return fileInfo;
+
+      // 원본 파일명을 메타데이터 파일로 저장
+      if (!originalName.isEmpty()) {
+        Path metaFile = storageLocation.resolve(fileId.toString() + ".meta");
+        Files.writeString(metaFile, originalName);
+      }
+
+      return new FileInfo(fileId, fileExtension, originalName);
     } catch (IOException ex) {
       throw new RuntimeException("파일을 저장할 수 없습니다: " + fileName, ex);
     }
@@ -173,6 +192,7 @@ public class FileStorageService {
       try (Stream<Path> paths = Files.list(storageLocation)) {
         List<Path> sortedPaths = paths
             .filter(Files::isRegularFile)
+            .filter(path -> !path.getFileName().toString().endsWith(".meta")) // 메타데이터 파일 제외
             .sorted((p1, p2) -> {
               try {
                 return Files.getLastModifiedTime(p2).compareTo(Files.getLastModifiedTime(p1));
@@ -190,15 +210,29 @@ public class FileStorageService {
           String fileName = filePath.getFileName().toString();
 
           int lastDotIndex = fileName.lastIndexOf(".");
+          UUID fileId;
+          String extension;
           if (lastDotIndex == -1) {
-            UUID fileId = UUID.fromString(fileName);
-            fileList.add(new FileInfo(fileId, ""));
+            fileId = UUID.fromString(fileName);
+            extension = "";
           } else {
             String idString = fileName.substring(0, lastDotIndex);
-            String extension = fileName.substring(lastDotIndex);
-            UUID fileId = UUID.fromString(idString);
-            fileList.add(new FileInfo(fileId, extension));
+            extension = fileName.substring(lastDotIndex);
+            fileId = UUID.fromString(idString);
           }
+
+          // 메타데이터 파일에서 원본 파일명 읽기
+          String originalFileName = null;
+          try {
+            Path metaFile = storageLocation.resolve(fileId.toString() + ".meta");
+            if (Files.exists(metaFile)) {
+              originalFileName = Files.readString(metaFile).trim();
+            }
+          } catch (IOException e) {
+            // 메타데이터 파일 읽기 실패 시 무시
+          }
+
+          fileList.add(new FileInfo(fileId, extension, originalFileName));
         }
       }
 
@@ -212,7 +246,10 @@ public class FileStorageService {
     try {
       Path storageLocation = getStorageLocation(fileType);
       try (Stream<Path> paths = Files.list(storageLocation)) {
-        return paths.filter(Files::isRegularFile).count();
+        return paths
+            .filter(Files::isRegularFile)
+            .filter(path -> !path.getFileName().toString().endsWith(".meta")) // 메타데이터 파일 제외
+            .count();
       }
     } catch (IOException ex) {
       throw new RuntimeException("파일 개수를 조회할 수 없습니다: " + fileType, ex);
@@ -230,12 +267,57 @@ public class FileStorageService {
     return storeFile(newFile, fileType);
   }
 
+  public String getOriginalFileName(UUID id, FileType fileType) {
+    try {
+      Path storageLocation = getStorageLocation(fileType);
+      Path metaFile = storageLocation.resolve(id.toString() + ".meta");
+      if (Files.exists(metaFile)) {
+        return Files.readString(metaFile).trim();
+      }
+      return null;
+    } catch (IOException ex) {
+      return null;
+    }
+  }
+
+  public String getFileExtension(UUID id, FileType fileType) {
+    try {
+      Path storageLocation = getStorageLocation(fileType);
+      // UUID로 시작하는 파일 찾기
+      try (Stream<Path> paths = Files.list(storageLocation)) {
+        String idString = id.toString();
+        return paths
+            .filter(Files::isRegularFile)
+            .filter(path -> {
+              String fileName = path.getFileName().toString();
+              return fileName.startsWith(idString) && !fileName.endsWith(".meta");
+            })
+            .findFirst()
+            .map(path -> {
+              String fileName = path.getFileName().toString();
+              int lastDotIndex = fileName.lastIndexOf(".");
+              if (lastDotIndex > 0) {
+                return fileName.substring(lastDotIndex);
+              }
+              return "";
+            })
+            .orElse("");
+      }
+    } catch (IOException ex) {
+      return "";
+    }
+  }
+
   public void deleteFile(UUID id, String extension, FileType fileType) {
     try {
       String fileName = id.toString() + (extension != null ? extension : "");
       Path storageLocation = getStorageLocation(fileType);
       Path filePath = storageLocation.resolve(fileName).normalize();
       Files.deleteIfExists(filePath);
+
+      // 메타데이터 파일도 삭제
+      Path metaFile = storageLocation.resolve(id.toString() + ".meta");
+      Files.deleteIfExists(metaFile);
     } catch (IOException ex) {
       throw new RuntimeException("파일을 삭제할 수 없습니다: " + id, ex);
     }
