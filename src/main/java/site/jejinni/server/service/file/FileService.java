@@ -65,6 +65,11 @@ public class FileService {
     FileStorageService.FileInfo fileInfo = fileStorageService.storeFile(file, fileType);
 
     // DB에 저장 (ID는 파일 시스템에서 생성된 UUID 사용)
+    // ID가 이미 존재하는지 확인 (동시 업로드 방지)
+    if (fileRepository.existsById(fileInfo.getId())) {
+      throw new RuntimeException("파일 ID가 이미 존재합니다: " + fileInfo.getId());
+    }
+
     File fileEntity = File.builder()
         .originalFileName(fileInfo.getOriginalFileName())
         .fileSize(file.getSize())

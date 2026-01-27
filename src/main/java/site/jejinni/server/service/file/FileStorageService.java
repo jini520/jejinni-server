@@ -106,6 +106,10 @@ public class FileStorageService {
   }
 
   public FileInfo storeFile(MultipartFile file, FileType fileType) {
+    return storeFile(file, fileType, null);
+  }
+
+  public FileInfo storeFile(MultipartFile file, FileType fileType, UUID fileId) {
     if (file.isEmpty()) {
       throw new IllegalArgumentException("업로드할 파일이 비어있습니다.");
     }
@@ -116,7 +120,9 @@ public class FileStorageService {
       fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
     }
 
-    UUID fileId = UUID.randomUUID();
+    if (fileId == null) {
+      fileId = UUID.randomUUID();
+    }
     String fileName = fileId.toString() + fileExtension;
     String originalName = originalFilename != null ? originalFilename : "";
 
@@ -285,7 +291,10 @@ public class FileStorageService {
     }
 
     if (oldId != null) {
+      // 기존 파일 삭제 (메타데이터 파일은 유지하지 않음)
       deleteFile(oldId, fileType);
+      // 기존 ID를 재사용하여 새 파일 저장
+      return storeFile(newFile, fileType, oldId);
     }
     return storeFile(newFile, fileType);
   }
