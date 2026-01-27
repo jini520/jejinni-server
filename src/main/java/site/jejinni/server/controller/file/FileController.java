@@ -130,34 +130,27 @@ public class FileController {
     String originalFileName = fileStorageService.getOriginalFileName(id, type);
     String resourceFilename = resource.getFilename();
 
-    // 디버깅: 파일명 정보 출력
-    System.out.println("=== File Download Debug ===");
-    System.out.println("File ID: " + id);
-    System.out.println("File Type: " + type);
-    System.out.println("Extension: " + extension);
-    System.out.println("Resource Filename (UUID.extension): " + resourceFilename);
-    System.out.println("Original File Name (from .meta): " + originalFileName);
-    System.out.println("Original File Name is null: " + (originalFileName == null));
-    System.out.println("Original File Name is empty: " + (originalFileName != null && originalFileName.isEmpty()));
-
     // Content-Disposition 헤더 생성 (RFC 5987 형식으로 인코딩)
     String contentDispositionValue;
     if (originalFileName != null && !originalFileName.isEmpty()) {
       // 한글 및 특수문자 처리를 위해 UTF-8 인코딩 사용
       String encodedFileName = URLEncoder.encode(originalFileName, StandardCharsets.UTF_8)
           .replace("+", "%20"); // 공백 문자 처리
-      contentDispositionValue = String.format(
-          "attachment; filename=\"%s\"; filename*=UTF-8''%s",
-          originalFileName.replace("\"", "\\\""), // 따옴표 이스케이프
-          encodedFileName);
+      // ASCII 문자만 포함된 경우 filename 파라미터도 추가, 그렇지 않으면 filename*만 사용
+      boolean isAsciiOnly = originalFileName.matches("^[\\x00-\\x7F]*$");
+      if (isAsciiOnly) {
+        contentDispositionValue = String.format(
+            "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+            originalFileName.replace("\"", "\\\""), // 따옴표 이스케이프
+            encodedFileName);
+      } else {
+        // 한글이 포함된 경우 filename*만 사용
+        contentDispositionValue = String.format("attachment; filename*=UTF-8''%s", encodedFileName);
+      }
     } else {
       // originalFileName이 null이거나 비어있을 경우 resource filename 사용
-      System.out.println("WARNING: Original file name is null or empty, using resource filename");
       contentDispositionValue = "attachment; filename=\"" + resourceFilename + "\"";
     }
-
-    System.out.println("Content-Disposition Header: " + contentDispositionValue);
-    System.out.println("===========================");
 
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_OCTET_STREAM)
