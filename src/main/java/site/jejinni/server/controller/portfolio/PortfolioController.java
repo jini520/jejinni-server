@@ -14,8 +14,6 @@ import site.jejinni.server.service.file.FileService;
 import site.jejinni.server.service.file.FileStorageService;
 import site.jejinni.server.service.file.FileType;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -64,27 +62,8 @@ public class PortfolioController {
     String originalFileName = fileService.getFileInfo(id, FILE_TYPE).getOriginalFileName();
     String resourceFilename = resource.getFilename();
 
-    // Content-Disposition 헤더 생성 (RFC 5987 형식으로 인코딩)
-    String contentDispositionValue;
-    if (originalFileName != null && !originalFileName.isEmpty()) {
-      // 한글 및 특수문자 처리를 위해 UTF-8 인코딩 사용
-      String encodedFileName = URLEncoder.encode(originalFileName, StandardCharsets.UTF_8)
-          .replace("+", "%20"); // 공백 문자 처리
-      // ASCII 문자만 포함된 경우 filename 파라미터도 추가, 그렇지 않으면 filename*만 사용
-      boolean isAsciiOnly = originalFileName.matches("^[\\x00-\\x7F]*$");
-      if (isAsciiOnly) {
-        contentDispositionValue = String.format(
-            "attachment; filename=\"%s\"; filename*=UTF-8''%s",
-            originalFileName.replace("\"", "\\\""), // 따옴표 이스케이프
-            encodedFileName);
-      } else {
-        // 한글이 포함된 경우 filename*만 사용
-        contentDispositionValue = String.format("attachment; filename*=UTF-8''%s", encodedFileName);
-      }
-    } else {
-      // originalFileName이 null이거나 비어있을 경우 resource filename 사용
-      contentDispositionValue = "attachment; filename=\"" + resourceFilename + "\"";
-    }
+    // Content-Disposition 헤더 생성 (공통 유틸리티 사용)
+    String contentDispositionValue = fileService.createContentDispositionHeader(originalFileName, resourceFilename);
 
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(MediaType.APPLICATION_OCTET_STREAM_VALUE))

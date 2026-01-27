@@ -11,10 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -166,107 +163,44 @@ public class FileStorageService {
     }
   }
 
+  /**
+   * @deprecated 파일 크기는 이제 DB에서 조회합니다. FileService.getFileInfo()를 사용하세요.
+   */
+  @Deprecated
   public long getFileSize(UUID id, FileType fileType) {
-    try {
-      String extension = getFileExtension(id, fileType);
-      String fileName = id.toString() + (extension != null ? extension : "");
-      Path storageLocation = getStorageLocation(fileType);
-      Path filePath = storageLocation.resolve(fileName).normalize();
-      return Files.size(filePath);
-    } catch (IOException ex) {
-      throw new RuntimeException("파일 크기를 조회할 수 없습니다: " + id, ex);
-    }
+    throw new UnsupportedOperationException("파일 크기는 DB에서 조회해야 합니다. FileService.getFileInfo()를 사용하세요.");
   }
 
+  /**
+   * @deprecated 파일 생성일은 이제 DB에서 조회합니다. FileService.getFileInfo()를 사용하세요.
+   */
+  @Deprecated
   public LocalDateTime getFileCreatedAt(UUID id, FileType fileType) {
-    try {
-      String extension = getFileExtension(id, fileType);
-      String fileName = id.toString() + (extension != null ? extension : "");
-      Path storageLocation = getStorageLocation(fileType);
-      Path filePath = storageLocation.resolve(fileName).normalize();
-      FileTime creationTime = (FileTime) Files.getAttribute(filePath, "creationTime");
-      if (creationTime == null) {
-        creationTime = Files.getLastModifiedTime(filePath);
-      }
-      return LocalDateTime.ofInstant(creationTime.toInstant(), ZoneId.systemDefault());
-    } catch (IOException ex) {
-      throw new RuntimeException("파일 생성일을 조회할 수 없습니다: " + id, ex);
-    }
+    throw new UnsupportedOperationException("파일 생성일은 DB에서 조회해야 합니다. FileService.getFileInfo()를 사용하세요.");
   }
 
+  /**
+   * @deprecated 파일 수정일은 이제 DB에서 조회합니다. FileService.getFileInfo()를 사용하세요.
+   */
+  @Deprecated
   public LocalDateTime getFileUpdatedAt(UUID id, FileType fileType) {
-    try {
-      String extension = getFileExtension(id, fileType);
-      String fileName = id.toString() + (extension != null ? extension : "");
-      Path storageLocation = getStorageLocation(fileType);
-      Path filePath = storageLocation.resolve(fileName).normalize();
-      FileTime lastModifiedTime = Files.getLastModifiedTime(filePath);
-      return LocalDateTime.ofInstant(lastModifiedTime.toInstant(), ZoneId.systemDefault());
-    } catch (IOException ex) {
-      throw new RuntimeException("파일 수정일을 조회할 수 없습니다: " + id, ex);
-    }
+    throw new UnsupportedOperationException("파일 수정일은 DB에서 조회해야 합니다. FileService.getFileInfo()를 사용하세요.");
   }
 
+  /**
+   * @deprecated 파일 리스트는 이제 DB에서 조회합니다. FileService.getFileList()를 사용하세요.
+   */
+  @Deprecated
   public List<FileInfo> getFileList(FileType fileType, int page, int size) {
-    try {
-      Path storageLocation = getStorageLocation(fileType);
-      List<FileInfo> fileList = new ArrayList<>();
-
-      try (Stream<Path> paths = Files.list(storageLocation)) {
-        List<Path> sortedPaths = paths
-            .filter(Files::isRegularFile)
-            .filter(path -> !path.getFileName().toString().endsWith(".meta")) // 메타데이터 파일 제외
-            .sorted((p1, p2) -> {
-              try {
-                return Files.getLastModifiedTime(p2).compareTo(Files.getLastModifiedTime(p1));
-              } catch (IOException e) {
-                return 0;
-              }
-            })
-            .toList();
-
-        int start = page * size;
-        int end = Math.min(start + size, sortedPaths.size());
-
-        for (int i = start; i < end; i++) {
-          Path filePath = sortedPaths.get(i);
-          String fileName = filePath.getFileName().toString();
-
-          int lastDotIndex = fileName.lastIndexOf(".");
-          UUID fileId;
-          String extension;
-          if (lastDotIndex == -1) {
-            fileId = UUID.fromString(fileName);
-            extension = "";
-          } else {
-            String idString = fileName.substring(0, lastDotIndex);
-            extension = fileName.substring(lastDotIndex);
-            fileId = UUID.fromString(idString);
-          }
-
-          // 원본 파일명은 DB에서 가져와야 하므로 null로 설정
-          fileList.add(new FileInfo(fileId, extension, null));
-        }
-      }
-
-      return fileList;
-    } catch (IOException ex) {
-      throw new RuntimeException("파일 리스트를 조회할 수 없습니다: " + fileType, ex);
-    }
+    throw new UnsupportedOperationException("파일 리스트는 DB에서 조회해야 합니다. FileService.getFileList()를 사용하세요.");
   }
 
+  /**
+   * @deprecated 파일 개수는 이제 DB에서 조회합니다. FileService.getFileList()를 사용하세요.
+   */
+  @Deprecated
   public long getFileCount(FileType fileType) {
-    try {
-      Path storageLocation = getStorageLocation(fileType);
-      try (Stream<Path> paths = Files.list(storageLocation)) {
-        return paths
-            .filter(Files::isRegularFile)
-            .filter(path -> !path.getFileName().toString().endsWith(".meta")) // 메타데이터 파일 제외
-            .count();
-      }
-    } catch (IOException ex) {
-      throw new RuntimeException("파일 개수를 조회할 수 없습니다: " + fileType, ex);
-    }
+    throw new UnsupportedOperationException("파일 개수는 DB에서 조회해야 합니다. FileService.getFileList()를 사용하세요.");
   }
 
   public FileInfo updateFile(UUID oldId, MultipartFile newFile, FileType fileType) {
@@ -302,7 +236,7 @@ public class FileStorageService {
             .filter(Files::isRegularFile)
             .filter(path -> {
               String fileName = path.getFileName().toString();
-              return fileName.startsWith(idString) && !fileName.endsWith(".meta");
+              return fileName.startsWith(idString);
             })
             .findFirst()
             .map(path -> {

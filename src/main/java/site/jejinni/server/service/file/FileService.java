@@ -184,7 +184,33 @@ public class FileService {
     return switch (fileType) {
       case RESUME -> "/api/resumes/download/" + id;
       case PORTFOLIO -> "/api/portfolios/download/" + id;
-      case IMAGE, DOCUMENT -> "/api/files/download/" + id + "?type=" + fileType;
+      case IMAGE, DOCUMENT ->
+        throw new IllegalArgumentException("IMAGE와 DOCUMENT 타입은 지원하지 않습니다. RESUME 또는 PORTFOLIO 타입을 사용하세요.");
     };
+  }
+
+  /**
+   * 파일 다운로드를 위한 Content-Disposition 헤더 값 생성 (공통 유틸리티)
+   */
+  public String createContentDispositionHeader(String originalFileName, String resourceFilename) {
+    if (originalFileName != null && !originalFileName.isEmpty()) {
+      // 한글 및 특수문자 처리를 위해 UTF-8 인코딩 사용
+      String encodedFileName = java.net.URLEncoder.encode(originalFileName, java.nio.charset.StandardCharsets.UTF_8)
+          .replace("+", "%20"); // 공백 문자 처리
+      // ASCII 문자만 포함된 경우 filename 파라미터도 추가, 그렇지 않으면 filename*만 사용
+      boolean isAsciiOnly = originalFileName.matches("^[\\x00-\\x7F]*$");
+      if (isAsciiOnly) {
+        return String.format(
+            "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+            originalFileName.replace("\"", "\\\""), // 따옴표 이스케이프
+            encodedFileName);
+      } else {
+        // 한글이 포함된 경우 filename*만 사용
+        return String.format("attachment; filename*=UTF-8''%s", encodedFileName);
+      }
+    } else {
+      // originalFileName이 null이거나 비어있을 경우 resource filename 사용
+      return "attachment; filename=\"" + resourceFilename + "\"";
+    }
   }
 }
