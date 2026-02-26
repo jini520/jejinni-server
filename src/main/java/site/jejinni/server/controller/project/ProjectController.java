@@ -72,6 +72,18 @@ public class ProjectController {
 	}
 
 	/**
+	 * 프로젝트 콘텐츠 이미지 삭제.
+	 * 파일을 삭제하고 해당 프로젝트의 contentImageUrls에서 URL을 제거합니다.
+	 */
+	@DeleteMapping("/{projectId}/images/{fileId}")
+	public ResponseEntity<ApiResponse<ProjectDetailDto>> deleteProjectImage(
+			@PathVariable UUID projectId,
+			@PathVariable UUID fileId) {
+		ApiResponse<ProjectDetailDto> updated = projectService.removeContentImageUrl(projectId, fileId);
+		return ResponseEntity.ok(updated);
+	}
+
+	/**
 	 * 프로젝트 콘텐츠 이미지 조회 (마크다운 등에서 참조하는 URL용).
 	 */
 	@GetMapping("/{projectId}/images/{fileId}")

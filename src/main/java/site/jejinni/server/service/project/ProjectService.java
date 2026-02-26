@@ -12,8 +12,10 @@ import site.jejinni.server.dto.project.ProjectListItemDto;
 import site.jejinni.server.dto.project.ProjectListDto;
 import site.jejinni.server.dto.project.ProjectRequestDto;
 import site.jejinni.server.repository.project.ProjectRepository;
+import site.jejinni.server.service.file.FileStorageService;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class ProjectService {
 
 	private final ProjectRepository projectRepository;
+	private final FileStorageService fileStorageService;
 
 	public ApiResponse<ProjectListDto> getProjectList(Pageable pageable) {
 		Page<Project> projects = projectRepository.findAllByOrderByOrderAsc(pageable);
@@ -125,6 +128,33 @@ public class ProjectService {
 		String[] updated = Arrays.copyOf(existing, existing.length + 1);
 		updated[existing.length] = newImageUrl;
 		project.updateContentImageUrls(updated);
+
+		return new ApiResponse<>(buildDetailResponse(project));
+	}
+
+	/**
+	 * 프로젝트의 contentImageUrls에서 해당 이미지 URL을 제거하고 파일을 삭제합니다.
+	 */
+	@Transactional
+	public ApiResponse<ProjectDetailDto> removeContentImageUrl(UUID projectId, UUID fileId) {
+		Project project = projectRepository.findById(projectId)
+				.orElseThrow(() -> new IllegalArgumentException("Project not found with id: " + projectId));
+
+		String targetUrl = "/api/projects/" + projectId + "/images/" + fileId;
+		String[] existing = project.getContentImageUrls();
+		if (existing == null) {
+			existing = new String[0];
+		}
+		String[] updated = Arrays.stream(existing)
+				.filter(url -> !Objects.equals(url, targetUrl))
+				.toArray(String[]::new);
+
+		if (updated.length == existing.length) {
+			throw new IllegalArgumentException("Image not found in project: " + fileId);
+		}
+
+		project.updateContentImageUrls(updated);
+		fileStorageService.deleteProjectImage(projectId, fileId);
 
 		return new ApiResponse<>(buildDetailResponse(project));
 	}

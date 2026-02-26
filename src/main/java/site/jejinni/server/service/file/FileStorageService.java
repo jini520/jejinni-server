@@ -340,4 +340,19 @@ public class FileStorageService {
       throw new RuntimeException("파일을 삭제할 수 없습니다: " + id, ex);
     }
   }
+
+  /**
+   * 프로젝트 콘텐츠 이미지를 파일 시스템에서 삭제합니다.
+   */
+  public void deleteProjectImage(UUID projectId, UUID fileId) {
+    try {
+      String extension = getProjectImageExtension(projectId, fileId);
+      String fileName = fileId.toString() + (extension != null ? extension : "");
+      Path projectDir = getStorageLocation(FileType.IMAGE).resolve(projectId.toString());
+      Path filePath = projectDir.resolve(fileName).normalize();
+      Files.deleteIfExists(filePath);
+    } catch (IOException ex) {
+      throw new RuntimeException("프로젝트 이미지를 삭제할 수 없습니다: " + fileId, ex);
+    }
+  }
 }
