@@ -38,6 +38,10 @@ public class Project extends BaseEntity {
 	@Column(name = "period", length = 50)
 	private String period;
 
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "content_image_urls", columnDefinition = "text[]")
+	private String[] contentImageUrls;
+
 	@Column(name = "contents", columnDefinition = "TEXT")
 	private String contents;
 
@@ -45,12 +49,14 @@ public class Project extends BaseEntity {
 	private Integer order;
 
 	@Builder
-	public Project(String title, String description, String[] skills, Integer participants, String period, String contents, Integer order) {
+	public Project(String title, String description, String[] skills, Integer participants, String period,
+			String[] contentImageUrls, String contents, Integer order) {
 		this.title = title;
 		this.description = description;
 		this.skills = skills != null ? skills : new String[0];
 		this.participants = participants != null ? participants : 0;
 		this.period = period;
+		this.contentImageUrls = contentImageUrls != null ? contentImageUrls : new String[0];
 		this.contents = contents;
 		this.order = order != null ? order : 0;
 	}
@@ -75,6 +81,10 @@ public class Project extends BaseEntity {
 		this.period = period;
 	}
 
+	public void updateContentImageUrls(String[] contentImageUrls) {
+		this.contentImageUrls = contentImageUrls != null ? contentImageUrls : new String[0];
+	}
+
 	public void updateContents(String contents) {
 		this.contents = contents;
 	}
@@ -83,4 +93,3 @@ public class Project extends BaseEntity {
 		this.order = order != null ? order : 0;
 	}
 }
-

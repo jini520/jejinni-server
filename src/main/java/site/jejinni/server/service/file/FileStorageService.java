@@ -134,6 +134,81 @@ public class FileStorageService {
     }
   }
 
+  /**
+   * 프로젝트 콘텐츠용 이미지를 저장합니다.
+   * 저장 경로: [imageUploadDir]/[projectId]/[fileId].[extension]
+   */
+  public FileInfo storeImageInProjectDir(MultipartFile file, UUID projectId) {
+    if (file.isEmpty()) {
+      throw new IllegalArgumentException("업로드할 파일이 비어있습니다.");
+    }
+
+    String originalFilename = file.getOriginalFilename();
+    String fileExtension = "";
+    if (originalFilename != null && originalFilename.contains(".")) {
+      fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+    }
+
+    UUID fileId = UUID.randomUUID();
+    String fileName = fileId.toString() + fileExtension;
+    String originalName = originalFilename != null ? originalFilename : "";
+
+    try {
+      Path imageRoot = getStorageLocation(FileType.IMAGE);
+      Path projectDir = imageRoot.resolve(projectId.toString());
+      Files.createDirectories(projectDir);
+      Path targetLocation = projectDir.resolve(fileName);
+      Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+      return new FileInfo(fileId, fileExtension, originalName);
+    } catch (IOException ex) {
+      throw new RuntimeException("파일을 저장할 수 없습니다: " + fileName, ex);
+    }
+  }
+
+  /**
+   * 프로젝트 콘텐츠 이미지를 리소스로 로드합니다.
+   */
+  public Resource loadProjectImageAsResource(UUID projectId, UUID fileId) {
+    String extension = getProjectImageExtension(projectId, fileId);
+    String fileName = fileId.toString() + (extension != null ? extension : "");
+    try {
+      Path projectDir = getStorageLocation(FileType.IMAGE).resolve(projectId.toString());
+      Path filePath = projectDir.resolve(fileName).normalize();
+      Resource resource = new UrlResource(filePath.toUri());
+      if (resource.exists()) {
+        return resource;
+      }
+      throw new RuntimeException("파일을 찾을 수 없습니다: " + fileName);
+    } catch (Exception ex) {
+      throw new RuntimeException("파일을 찾을 수 없습니다: " + fileName, ex);
+    }
+  }
+
+  public String getProjectImageExtension(UUID projectId, UUID fileId) {
+    try {
+      Path projectDir = getStorageLocation(FileType.IMAGE).resolve(projectId.toString());
+      if (!Files.isDirectory(projectDir)) {
+        return "";
+      }
+      try (Stream<Path> paths = Files.list(projectDir)) {
+        String idString = fileId.toString();
+        return paths
+            .filter(Files::isRegularFile)
+            .filter(path -> path.getFileName().toString().startsWith(idString))
+            .findFirst()
+            .map(path -> {
+              String name = path.getFileName().toString();
+              int lastDot = name.lastIndexOf(".");
+              return lastDot > 0 ? name.substring(lastDot) : "";
+            })
+            .orElse("");
+      }
+    } catch (IOException ex) {
+      return "";
+    }
+  }
+
   public Resource loadFileAsResource(UUID id, FileType fileType) {
     String extension = getFileExtension(id, fileType);
     String fileName = id.toString() + (extension != null ? extension : "");

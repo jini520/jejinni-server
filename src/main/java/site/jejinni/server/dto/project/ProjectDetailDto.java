@@ -15,6 +15,7 @@ public class ProjectDetailDto {
 	private String[] skills;
 	private Integer participants;
 	private String period;
+	private String[] contentImageUrls;
 	private String contents;
 	private Integer order;
 }

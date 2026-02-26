@@ -13,6 +13,7 @@ import site.jejinni.server.dto.project.ProjectListDto;
 import site.jejinni.server.dto.project.ProjectRequestDto;
 import site.jejinni.server.repository.project.ProjectRepository;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 @Service
@@ -47,6 +48,7 @@ public class ProjectService {
 				.skills(request.getSkills())
 				.participants(request.getParticipants())
 				.period(request.getPeriod())
+				.contentImageUrls(request.getContentImageUrls())
 				.contents(request.getContents())
 				.order(request.getOrder())
 				.build();
@@ -60,6 +62,7 @@ public class ProjectService {
 				.skills(project.getSkills())
 				.participants(project.getParticipants())
 				.period(project.getPeriod())
+				.contentImageUrls(project.getContentImageUrls())
 				.contents(project.getContents())
 				.order(project.getOrder())
 				.build();
@@ -71,18 +74,7 @@ public class ProjectService {
 		Project project = projectRepository.findById(projectId)
 				.orElseThrow(() -> new IllegalArgumentException("Project not found with id: " + projectId));
 
-		ProjectDetailDto data = ProjectDetailDto.builder()
-				.id(project.getId())
-				.title(project.getTitle())
-				.description(project.getDescription())
-				.skills(project.getSkills())
-				.participants(project.getParticipants())
-				.period(project.getPeriod())
-				.contents(project.getContents())
-				.order(project.getOrder())
-				.build();
-
-		return new ApiResponse<>(data);
+		return new ApiResponse<>(buildDetailResponse(project));
 	}
 
 	@Transactional
@@ -105,6 +97,9 @@ public class ProjectService {
 		if (request.getPeriod() != null) {
 			project.updatePeriod(request.getPeriod());
 		}
+		if (request.getContentImageUrls() != null) {
+			project.updateContentImageUrls(request.getContentImageUrls());
+		}
 		if (request.getContents() != null) {
 			project.updateContents(request.getContents());
 		}
@@ -112,6 +107,29 @@ public class ProjectService {
 			project.updateOrder(request.getOrder());
 		}
 
+		return new ApiResponse<>(buildDetailResponse(project));
+	}
+
+	/**
+	 * 프로젝트의 contentImageUrls에 이미지 URL 한 개를 추가합니다.
+	 */
+	@Transactional
+	public ApiResponse<ProjectDetailDto> addContentImageUrl(UUID projectId, String newImageUrl) {
+		Project project = projectRepository.findById(projectId)
+				.orElseThrow(() -> new IllegalArgumentException("Project not found with id: " + projectId));
+
+		String[] existing = project.getContentImageUrls();
+		if (existing == null) {
+			existing = new String[0];
+		}
+		String[] updated = Arrays.copyOf(existing, existing.length + 1);
+		updated[existing.length] = newImageUrl;
+		project.updateContentImageUrls(updated);
+
+		return new ApiResponse<>(buildDetailResponse(project));
+	}
+
+	private ProjectDetailDto buildDetailResponse(Project project) {
 		ProjectDetailDto data = ProjectDetailDto.builder()
 				.id(project.getId())
 				.title(project.getTitle())
@@ -119,11 +137,12 @@ public class ProjectService {
 				.skills(project.getSkills())
 				.participants(project.getParticipants())
 				.period(project.getPeriod())
+				.contentImageUrls(project.getContentImageUrls())
 				.contents(project.getContents())
 				.order(project.getOrder())
 				.build();
 
-		return new ApiResponse<>(data);
+		return data;
 	}
 
 	private ProjectListItemDto toListDto(Project project) {
