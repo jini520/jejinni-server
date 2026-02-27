@@ -55,6 +55,15 @@ public class ProjectController {
 	}
 
 	/**
+	 * 프로젝트 삭제. 상세 데이터 및 업로드된 이미지(./uploads/images/[project-id]/)를 모두 삭제합니다.
+	 */
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> deleteProject(@PathVariable UUID id) {
+		projectService.deleteProject(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	/**
 	 * 프로젝트 콘텐츠용 이미지 업로드.
 	 * 저장 경로: ./uploads/images/[project-uuid]/[file-uuid].[extension]
 	 * 업로드 후 해당 프로젝트의 contentImageUrls에 URL이 추가됩니다.

@@ -114,6 +114,18 @@ public class ProjectService {
 	}
 
 	/**
+	 * 프로젝트를 삭제합니다. 업로드된 이미지 디렉터리와 DB 레코드를 모두 삭제합니다.
+	 */
+	@Transactional
+	public void deleteProject(UUID projectId) {
+		Project project = projectRepository.findById(projectId)
+				.orElseThrow(() -> new IllegalArgumentException("Project not found with id: " + projectId));
+
+		fileStorageService.deleteProjectImageDir(projectId);
+		projectRepository.delete(project);
+	}
+
+	/**
 	 * 프로젝트의 contentImageUrls에 이미지 URL 한 개를 추가합니다.
 	 */
 	@Transactional

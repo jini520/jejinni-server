@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -353,6 +354,31 @@ public class FileStorageService {
       Files.deleteIfExists(filePath);
     } catch (IOException ex) {
       throw new RuntimeException("프로젝트 이미지를 삭제할 수 없습니다: " + fileId, ex);
+    }
+  }
+
+  /**
+   * 프로젝트에 업로드된 모든 이미지 디렉터리를 삭제합니다.
+   * [imageUploadDir]/[projectId]/ 하위 파일 및 디렉터리 전체 삭제.
+   */
+  public void deleteProjectImageDir(UUID projectId) {
+    try {
+      Path projectDir = getStorageLocation(FileType.IMAGE).resolve(projectId.toString());
+      if (!Files.exists(projectDir) || !Files.isDirectory(projectDir)) {
+        return;
+      }
+      try (Stream<Path> walk = Files.walk(projectDir)) {
+        walk.sorted(Comparator.reverseOrder())
+            .forEach(path -> {
+              try {
+                Files.delete(path);
+              } catch (IOException ex) {
+                throw new RuntimeException("프로젝트 이미지 디렉터리를 삭제할 수 없습니다: " + projectId, ex);
+              }
+            });
+      }
+    } catch (IOException ex) {
+      throw new RuntimeException("프로젝트 이미지 디렉터리를 삭제할 수 없습니다: " + projectId, ex);
     }
   }
 }
